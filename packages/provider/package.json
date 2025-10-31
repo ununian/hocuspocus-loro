@@ -32,6 +32,7 @@
 		"@hocuspocus/common": "^3.4.0",
 		"@lifeomic/attempt": "^3.0.2",
 		"lib0": "^0.2.87",
+		"loro-crdt": "^1.8.8",
 		"ws": "^8.17.1"
 	},
 	"peerDependencies": {

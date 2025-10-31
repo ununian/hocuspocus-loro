@@ -20,6 +20,11 @@ export enum MessageType {
 	BroadcastStateless = 6,
 	CLOSE = 7,
 	SyncStatus = 8,
+	// Loro specific message types (additive, backward compatible)
+	LoroUpdate = 20,
+	LoroSyncRequest = 21,
+	LoroSyncBatch = 22,
+	LoroEphemeral = 23,
 }
 
 export interface AwarenessUpdate {

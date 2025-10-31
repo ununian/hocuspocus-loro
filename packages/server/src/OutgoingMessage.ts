@@ -134,6 +134,30 @@ export class OutgoingMessage {
 		return this;
 	}
 
+	// Loro-specific helpers
+	writeLoroUpdate(update: Uint8Array): OutgoingMessage {
+		this.category = "LoroUpdate";
+		writeVarUint(this.encoder, MessageType.LoroUpdate);
+		writeVarUint8Array(this.encoder, update);
+		return this;
+	}
+
+	writeLoroSyncBatch(updates: Uint8Array[]): OutgoingMessage {
+		this.category = "LoroSyncBatch";
+		writeVarUint(this.encoder, MessageType.LoroSyncBatch);
+		// encode number of updates, then each as varUint8Array
+		writeVarUint(this.encoder, updates.length as unknown as number);
+		updates.forEach((u) => writeVarUint8Array(this.encoder, u));
+		return this;
+	}
+
+	writeLoroEphemeral(update: Uint8Array): OutgoingMessage {
+		this.category = "LoroEphemeral";
+		writeVarUint(this.encoder, MessageType.LoroEphemeral);
+		writeVarUint8Array(this.encoder, update);
+		return this;
+	}
+
 	// TODO: should this be write* or create* as method name?
 	writeSyncStatus(updateSaved: boolean): OutgoingMessage {
 		this.category = "SyncStatus";

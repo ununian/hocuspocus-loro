@@ -13,11 +13,26 @@ import type { AwarenessUpdate } from "./types.ts";
 export class Document extends Doc {
 	awareness: Awareness;
 
+	// In-memory storage for Loro updates (append-only). This is intentionally
+	// simple and can be persisted via existing hooks if desired.
+	loroUpdates: Uint8Array[] = [];
+
+	// Loro document instance for server-side CRDT operations
+	// This allows for proper version vector handling and incremental exports
+	// The LoroDoc is optional - if not provided, we fall back to simple update storage
+	loroDoc: any | null = null;
+
 	callbacks = {
 		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		onUpdate: (
 			document: Document,
 			connection: Connection,
+			update: Uint8Array,
+		) => {},
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
+		onLoroUpdate: (
+			document: Document,
+			connection: Connection | undefined,
 			update: Uint8Array,
 		) => {},
 		beforeBroadcastStateless: (document: Document, stateless: string) => {},
@@ -91,6 +106,41 @@ export class Document extends Doc {
 		) => void,
 	): Document {
 		this.callbacks.onUpdate = callback;
+
+		return this;
+	}
+
+	/**
+	 * Set the LoroDoc instance for this document. This enables proper version
+	 * vector handling and incremental exports.
+	 */
+	setLoroDoc(loroDoc: any): Document {
+		this.loroDoc = loroDoc;
+		// If we have existing updates, import them into the LoroDoc
+		if (loroDoc && this.loroUpdates.length > 0) {
+			this.loroUpdates.forEach(update => {
+				try {
+					// @ts-ignore - LoroDoc interface may not be available at compile time
+					loroDoc.import(update);
+				} catch (e) {
+					// Ignore import errors for existing updates
+				}
+			});
+		}
+		return this;
+	}
+
+	/**
+	 * Set a callback that will be triggered when a Loro update is received
+	 */
+	onLoroUpdate(
+		callback: (
+			document: Document,
+			connection: Connection | undefined,
+			update: Uint8Array,
+		) => void,
+	): Document {
+		this.callbacks.onLoroUpdate = callback;
 
 		return this;
 	}
@@ -238,6 +288,79 @@ export class Document extends Doc {
 			connection.send(message.toUint8Array());
 		});
 
+		return this;
+	}
+
+	/**
+	 * Append a Loro update, broadcast to all connections.
+	 */
+	public handleLoroUpdate(update: Uint8Array, origin?: Connection): Document {
+		this.loroUpdates.push(update);
+
+		// Import into LoroDoc if available
+		if (this.loroDoc) {
+			try {
+				// @ts-ignore - LoroDoc interface may not be available at compile time
+				this.loroDoc.import(update);
+			} catch (e) {
+				// Ignore import errors but log them
+				console.error('Failed to import Loro update:', e);
+			}
+		}
+
+		const message = new OutgoingMessage(this.name).writeLoroUpdate(update);
+		this.getConnections().forEach((conn) => {
+			if (origin && conn === origin) return;
+			conn.send(message.toUint8Array());
+		});
+
+		// Trigger the callback
+		this.callbacks.onLoroUpdate(this, origin, update);
+
+		return this;
+	}
+
+	/**
+	 * Export Loro updates based on version vector for efficient synchronization.
+	 * If versionVector is provided, only exports missing updates.
+	 * If no LoroDoc is available, falls back to all stored updates.
+	 */
+	public exportLoroUpdates(versionVector?: any): Uint8Array[] {
+		if (this.loroDoc && versionVector) {
+			try {
+				// @ts-ignore - LoroDoc interface may not be available at compile time
+				const update = this.loroDoc.export({ mode: "update", from: versionVector });
+				// If export returns a single update, wrap it in array
+				return update instanceof Uint8Array ? [update] : update;
+			} catch (e) {
+				console.error('Failed to export Loro updates with version vector:', e);
+				// Fall back to all updates
+			}
+		}
+
+		if (this.loroDoc) {
+			try {
+				// @ts-ignore - LoroDoc interface may not be available at compile time
+				const update = this.loroDoc.export({ mode: "update" });
+				return update instanceof Uint8Array ? [update] : update;
+			} catch (e) {
+				console.error('Failed to export Loro updates:', e);
+			}
+		}
+
+		// Fallback to stored updates
+		return this.loroUpdates;
+	}
+
+	/**
+	 * Broadcast an ephemeral Loro update to all connections (not stored).
+	 */
+	public broadcastLoroEphemeral(update: Uint8Array, origin?: Connection): Document {
+		const message = new OutgoingMessage(this.name).writeLoroEphemeral(update);
+		this.getConnections().forEach((conn) => {
+			if (origin && conn === origin) return;
+			conn.send(message.toUint8Array());
+		});
 		return this;
 	}
 

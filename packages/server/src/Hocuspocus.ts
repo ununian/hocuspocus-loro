@@ -345,6 +345,11 @@ export class Hocuspocus {
 			...yDocOptions,
 		});
 
+		// Initialize LoroDoc if available in the context
+		if (context?.loroDoc) {
+			document.setLoroDoc(context.loroDoc);
+		}
+
 		const hookPayload = {
 			instance: this,
 			context,
@@ -387,6 +392,20 @@ export class Hocuspocus {
 				this.handleDocumentUpdate(
 					document,
 					connection,
+					update,
+					connection?.request,
+				);
+			},
+		);
+
+		document.onLoroUpdate(
+			(document: Document, connection: Connection | undefined, update: Uint8Array) => {
+				document.lastChangeTime = Date.now();
+
+				// For Loro updates, we can reuse the same handling logic as Yjs updates
+				this.handleDocumentUpdate(
+					document,
+					connection, // May be undefined for some cases
 					update,
 					connection?.request,
 				);

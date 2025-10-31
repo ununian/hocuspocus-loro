@@ -36,7 +36,7 @@ export class MessageReceiver {
 		const type = message.readVarUint();
 		const emptyMessageLength = message.length;
 
-		switch (type) {
+			switch (type) {
 			case MessageType.Sync:
 			case MessageType.SyncReply: {
 				message.writeVarUint(MessageType.Sync);
@@ -62,6 +62,45 @@ export class MessageReceiver {
 					}
 				}
 
+				break;
+			}
+
+			case MessageType.LoroUpdate: {
+				// Receive a Loro binary update, store and broadcast
+				const update = message.readVarUint8Array();
+				document.handleLoroUpdate(update, connection);
+				break;
+			}
+
+			case MessageType.LoroSyncRequest: {
+				// Parse optional version vector from client
+				let versionVector: any = undefined;
+				try {
+					const versionJSON = message.readVarString();
+					if (versionJSON) {
+						versionVector = JSON.parse(versionJSON);
+					}
+				} catch (e) {
+					// Ignore version vector parsing errors, fall back to full sync
+					console.debug('Failed to parse version vector:', e);
+				}
+
+				// Export updates based on version vector for efficient sync
+				const updates = document.exportLoroUpdates(versionVector);
+				const out = new OutgoingMessage(document.name).writeLoroSyncBatch(updates);
+
+				if (reply) {
+					reply(out.toUint8Array());
+				} else if (connection) {
+					connection.send(out.toUint8Array());
+				}
+				break;
+			}
+
+			case MessageType.LoroEphemeral: {
+				// Broadcast without storing
+				const update = message.readVarUint8Array();
+				document.broadcastLoroEphemeral(update, connection);
 				break;
 			}
 			case MessageType.Awareness: {

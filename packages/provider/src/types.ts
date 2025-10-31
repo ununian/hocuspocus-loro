@@ -20,6 +20,11 @@ export enum MessageType {
 	Stateless = 5,
 	CLOSE = 7,
 	SyncStatus = 8,
+	// Loro specific message types (must match @hocuspocus/server)
+	LoroUpdate = 20,
+	LoroSyncRequest = 21,
+	LoroSyncBatch = 22,
+	LoroEphemeral = 23,
 }
 
 export enum WebSocketStatus {
@@ -55,7 +60,9 @@ export type ConstructableOutgoingMessage =
 	| Constructable<QueryAwarenessMessage>
 	| Constructable<SyncStepOneMessage>
 	| Constructable<SyncStepTwoMessage>
-	| Constructable<UpdateMessage>;
+	| Constructable<UpdateMessage>
+	// Loro
+	| Constructable<any>;
 
 export type onAuthenticationFailedParameters = {
 	reason: string;

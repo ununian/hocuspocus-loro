@@ -3,7 +3,9 @@ import { retry } from "@lifeomic/attempt";
 import * as time from "lib0/time";
 import type { Event, MessageEvent } from "ws";
 import EventEmitter from "./EventEmitter.ts";
-import type { HocuspocusProvider } from "./HocuspocusProvider.ts";
+// Avoid tight coupling with a specific Provider type to allow alternative providers (e.g., Loro)
+// eslint-disable-next-line @typescript-eslint/ban-types
+type ProviderLike = any;
 import { IncomingMessage } from "./IncomingMessage.ts";
 import { CloseMessage } from "./OutgoingMessages/CloseMessage.ts";
 import {
@@ -93,7 +95,7 @@ export interface CompleteHocuspocusProviderWebsocketConfiguration {
 	/**
 	 * Map of attached providers keyed by documentName.
 	 */
-	providerMap: Map<string, HocuspocusProvider>;
+    providerMap: Map<string, ProviderLike>;
 }
 
 export class HocuspocusProviderWebsocket extends EventEmitter {
@@ -201,7 +203,7 @@ export class HocuspocusProviderWebsocket extends EventEmitter {
 		this.receivedOnOpenPayload = event;
 	}
 
-	attach(provider: HocuspocusProvider) {
+  attach(provider: ProviderLike) {
 		this.configuration.providerMap.set(provider.configuration.name, provider);
 
 		if (this.status === WebSocketStatus.Disconnected && this.shouldConnect) {
@@ -216,7 +218,7 @@ export class HocuspocusProviderWebsocket extends EventEmitter {
 		}
 	}
 
-	detach(provider: HocuspocusProvider) {
+  detach(provider: ProviderLike) {
 		if (this.configuration.providerMap.has(provider.configuration.name)) {
 			provider.send(CloseMessage, {
 				documentName: provider.configuration.name,
